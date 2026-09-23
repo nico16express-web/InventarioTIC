@@ -1,0 +1,33 @@
+// Esquema de base de datos del Inventario Tecnológico
+// Escuela Básica Mulchén
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Item {
+  id             String   @id @default(cuid())
+  nivel          String // Básica / Media / Parvularia
+  codigo         String // ID / Código o N° de serie
+  objeto         String // Objeto tecnológico
+  cantidad       Int      @default(1) // Stock
+  dependencia    String // Sala, laboratorio, oficina, etc.
+  financiamiento String // Inversión, Fondos SEP, Subvención regular, etc.
+  adquisicion    String // Donación, Compra, Sin información, etc.
+  categoria      String // Equipos informáticos, Multicopiadores, etc.
+  estado         String   @default("En uso") // En uso, En reparación, Dado de baja, etc.
+  fecha          String? // Año o fecha de adquisición (texto libre, admite "Sin información")
+  observaciones  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([categoria])
+  @@index([estado])
+  @@index([nivel])
+}

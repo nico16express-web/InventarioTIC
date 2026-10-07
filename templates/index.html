@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Inventario Tecnológico Escolar</title>
+<style>
+:root{--ink:#1c2733;--mut:#5b6773;--line:#d5dbe1;--bg:#f3f5f7;--g:#083668;--gd:#062a52;--o:#ec8d27;--od:#d17a1a;--red:#b42318;--amb:#b54708}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.45 "Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:#fff;color:var(--g);border-bottom:4px solid var(--o);padding:10px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+h1{font-size:20px;margin:0;font-weight:700;line-height:1.15}.brand{display:flex;align-items:center;gap:14px}.brand img{height:62px;width:auto}.brand small{display:block;font-size:13px;font-weight:600;color:var(--o)}button.acc{background:var(--o);border-color:var(--o)}button.acc:hover{background:var(--od)}
+main{max-width:1800px;margin:auto;padding:18px 16px}
+.kpis{display:flex;gap:28px;flex-wrap:wrap;padding:4px 0 16px;border-bottom:1px solid var(--line);margin-bottom:16px}
+.kpis div b{display:block;font-size:24px;font-weight:600}.kpis span{color:var(--mut)}
+.kpis .warn b{color:var(--red)}
+.cats{flex:1;min-width:260px;display:grid;gap:3px}
+.cats i{display:grid;grid-template-columns:150px 1fr 36px;gap:8px;align-items:center;font-style:normal;font-size:12px;color:var(--mut)}
+.cats em{height:7px;background:var(--o);border-radius:2px;display:block}
+.cats span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+input,select,button{font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:5px;background:#fff;color:var(--ink)}
+button{cursor:pointer;background:var(--g);color:#fff;border-color:var(--g);font-weight:600}
+button:hover{background:var(--gd)}button.sec{background:#fff;color:var(--ink);border-color:var(--line)}
+button.sec:hover{background:#e9edf0}button.sm{padding:3px 9px;font-size:12px}
+button.dng{background:#fff;color:var(--red);border-color:var(--line)}button.dng:hover{background:#fdeceb}
+:focus-visible{outline:2px solid var(--o);outline-offset:1px}
+#q{flex:1;min-width:200px}
+.tw{overflow-x:auto;background:#fff;border:1px solid var(--line);border-radius:6px}
+table{width:100%;border-collapse:collapse}
+table{table-layout:fixed;min-width:980px}th,td{overflow-wrap:anywhere;padding:7px 8px;text-align:left;border-bottom:1px solid #e6eaee;vertical-align:middle;font-size:13px}
+th{white-space:nowrap}td.nw{white-space:nowrap}.sub{font-size:11px;color:var(--mut);margin-top:2px}
+th{background:var(--g);color:#fff;cursor:pointer;user-select:none;font-weight:600}
+tbody tr:hover{background:#fdf3e7}
+.st{font-weight:600;text-align:center}.st.z{color:var(--red)}
+.tag{font-size:12px;padding:1px 8px;border-radius:9px;border:1px solid}
+.t0{color:#0a5a54;border-color:#9fd3cd}.t1{color:#1d4ed8;border-color:#b6c8f5}.t2{color:var(--amb);border-color:#f1c79a}
+.act{display:flex;flex-direction:column;gap:4px}.act button{width:88px}
+.cnt{color:var(--mut);margin:8px 2px}
+dialog{border:0;border-radius:8px;padding:0;width:min(640px,94vw);box-shadow:0 10px 40px #0004}
+dialog::backdrop{background:#0008}
+dialog form,dialog .box{padding:20px 22px}
+dialog h2{margin:0 0 14px;font-size:17px}
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+.fg label{display:grid;gap:3px;color:var(--mut);font-size:12px}.fg label.full{grid-column:1/-1}
+.fg input,.fg select{color:var(--ink);font-size:14px}
+.ft{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+#toast{position:fixed;bottom:20px;left:50%;transform:translate(-50%,20px);background:var(--ink);color:#fff;padding:10px 18px;border-radius:6px;opacity:0;pointer-events:none;transition:.2s}
+#toast.show{opacity:1;transform:translate(-50%,0)}#toast.err{background:var(--red)}
+.hist{max-height:60vh;overflow:auto}
+@media(max-width:600px){.fg{grid-template-columns:1fr}main,header{padding-inline:14px}}
+@media(prefers-reduced-motion:reduce){ #toast{transition:none}}
+</style></head><body>
+<link rel="icon" href="/favicon.png">
+<header><div class="brand"><img src="/insignia.png" alt="Insignia Escuela Mulchén"><h1><small>Escuela Mulchén</small>Inventario Tecnológico Escolar</h1></div>
+<div class="bar" style="margin:0"><button class="sec" onclick="historial()">Historial</button>
+<button class="sec" onclick="exportar()">Exportar a Excel</button><button class="acc" onclick="abrir()">Agregar objeto</button></div></header>
+<main>
+<section class="kpis" id="kpis"></section>
+<div class="bar">
+<input id="q" type="search" placeholder="Buscar por ID u objeto" oninput="render()">
+<select id="fc" onchange="render()"><option value="">Todas las categorías</option></select>
+<select id="fe" onchange="render()"><option value="">Todos los estados</option></select>
+<select id="fd" onchange="render()"><option value="">Todas las dependencias</option></select>
+<button class="sec" onclick="resetear()">Limpiar filtros</button></div>
+<div class="tw"><table><colgroup><col style="width:6%"><col style="width:11%"><col style="width:23%"><col style="width:5%"><col style="width:14%"><col style="width:17%"><col style="width:8%"><col style="width:7%"><col style="width:9%"></colgroup><thead><tr id="th"></tr></thead><tbody id="tb"></tbody></table></div>
+<div class="cnt" id="cnt"></div>
+</main>
+<dialog id="dlg"><form id="frm" onsubmit="guardar(event)"><h2 id="dt"></h2><div class="fg" id="fg"></div>
+<div class="ft"><button type="button" class="sec" onclick="dlg.close()">Cancelar</button><button>Guardar cambios</button></div></form></dialog>
+<dialog id="dh"><div class="box"><h2>Historial de movimientos</h2><div class="hist"><table><colgroup><col style="width:6%"><col style="width:11%"><col style="width:23%"><col style="width:5%"><col style="width:14%"><col style="width:17%"><col style="width:8%"><col style="width:7%"><col style="width:9%"></colgroup><thead><tr><th>Fecha</th><th>Acción</th><th>Objeto</th><th>Detalle</th></tr></thead><tbody id="hb"></tbody></table></div>
+<div class="ft"><button class="sec" onclick="dh.close()">Cerrar</button></div></div></dialog>
+<div id="toast" role="status"></div>
+<script>
+const L={{ listas|tojson }};
+const COLS=[['nivel','Nivel'],['id','ID / Código'],['objeto_tecnologico','Objeto'],['cantidad','Stock'],['dependencia','Dependencia'],['categoria','Categoría'],['estado','Estado'],['fecha','Fecha']];
+const FORM=[['nivel','Nivel','s',L.niveles],['id','ID / Código','t'],['objeto_tecnologico','Objeto tecnológico','t','full'],['cantidad','Cantidad','n'],['dependencia','Dependencia','d'],['financiamiento','Financiamiento','s',L.financiamiento],['adquisicion','Adquisición','s',L.adquisicion],['categoria','Categoría','s',L.categorias,'full'],['estado','Estado','s',L.estados]];
+let items=[],sort={k:'objeto_tecnologico',d:1},edit=null;
+const $=s=>document.querySelector(s),dlg=$('#dlg'),dh=$('#dh');
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function api(u,m='GET',b){const r=await fetch(u,{method:m,headers:{'Content-Type':'application/json'},body:b&&JSON.stringify(b)});
+ const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Error inesperado');return j}
+function toast(m,e){const t=$('#toast');t.textContent=m;t.className=(e?'err ':'')+'show';clearTimeout(t._t);t._t=setTimeout(()=>t.className=e?'err':'',3000)}
+const opts=(a,sel,first)=>(first?`<option value="">${first}</option>`:'')+a.map(v=>`<option${v===sel?' selected':''}>${esc(v)}</option>`).join('');
+function fillFilters(){
+ const keep=['fc','fe','fd'].map(i=>$('#'+i).value);
+ $('#fc').innerHTML=opts([...new Set(items.map(i=>i.categoria).filter(Boolean))].sort(),keep[0],'Todas las categorías');
+ $('#fe').innerHTML=opts([...new Set(items.map(i=>i.estado).filter(Boolean))].sort(),keep[1],'Todos los estados');
+ $('#fd').innerHTML=opts([...new Set(items.map(i=>i.dependencia).filter(Boolean))].sort(),keep[2],'Todas las dependencias')}
+function resetear(){$('#q').value='';['fc','fe','fd'].forEach(i=>$('#'+i).value='');render()}
+const val=(r,k)=>k==='origen'?`${r.financiamiento} / ${r.adquisicion}`:r[k];
+function render(){
+ const q=$('#q').value.toLowerCase(),c=$('#fc').value,e=$('#fe').value,d=$('#fd').value;
+ const rows=items.filter(r=>(!q||r.id.toLowerCase().includes(q)||r.objeto_tecnologico.toLowerCase().includes(q))&&(!c||r.categoria===c)&&(!e||r.estado===e)&&(!d||r.dependencia===d))
+  .sort((a,b)=>{const x=val(a,sort.k),y=val(b,sort.k);return(typeof x==='number'?x-y:String(x).localeCompare(String(y),'es'))*sort.d});
+ $('#th').innerHTML=COLS.map(([k,t])=>`<th onclick="ordenar('${k}')">${t}${sort.k===k?(sort.d>0?' ▲':' ▼'):''}</th>`).join('')+'<th></th>';
+ $('#tb').innerHTML=rows.map(r=>`<tr><td class="nw">${esc(r.nivel)}</td><td class="id">${esc(r.id)}</td><td class="n">${esc(r.objeto_tecnologico)}<div class="sub">${esc(val(r,'origen'))}</div></td>
+  <td class="st nw${r.cantidad?'':' z'}">${r.cantidad}</td><td>${esc(r.dependencia)}</td><td>${esc(r.categoria)}</td>
+  <td class="nw"><span class="tag t${Math.max(0,L.estados.indexOf(r.estado))}">${esc(r.estado)}</span></td><td class="nw">${esc(r.fecha)}</td>
+  <td><div class="act"><button class="sec sm" data-a="e" data-id="${esc(r.id)}">Editar</button><button class="sec sm" data-a="d" data-id="${esc(r.id)}">Descontar</button><button class="dng sm" data-a="x" data-id="${esc(r.id)}">Eliminar</button></div></td></tr>`).join('')
+  ||'<tr><td colspan="9" style="padding:30px;text-align:center;color:var(--mut)">No hay objetos que coincidan. Cambia los filtros o agrega uno nuevo.</td></tr>';
+ $('#cnt').textContent=`Mostrando ${rows.length} de ${items.length} registros`;
+ kpis()}
+function kpis(){
+ const u=items.reduce((s,i)=>s+i.cantidad,0),z=items.filter(i=>!i.cantidad).length,ds=items.filter(i=>i.estado==='Descartable').length;
+ const by={};items.forEach(i=>by[i.categoria]=(by[i.categoria]||0)+1);
+ const top=Object.entries(by).sort((a,b)=>b[1]-a[1]).slice(0,4),mx=top[0]?top[0][1]:1;
+ $('#kpis').innerHTML=`<div><b>${items.length}</b><span>Registros</span></div><div><b>${u}</b><span>Unidades en stock</span></div>
+ <div class="${z?'warn':''}"><b>${z}</b><span>Sin stock</span></div><div><b>${ds}</b><span>Descartables</span></div>
+ <div class="cats">${top.map(([n,v])=>`<i><span title="${esc(n)}">${esc(n)}</span><em style="width:${v/mx*100}%"></em>${v}</i>`).join('')}</div>`}
+function ordenar(k){sort=sort.k===k?{k,d:-sort.d}:{k,d:1};render()}
+$('#tb').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const id=b.dataset.id;
+ ({e:()=>abrir(id),d:()=>descontar(id),x:()=>borrar(id)})[b.dataset.a]()});
+function fechaUI(v){const t=/^\d{4}$/.test(v)?'a':/^\d\d\/\d\d\/\d{4}$/.test(v)?'c':'s';
+ const iso=t==='c'?v.split('/').reverse().join('-'):'';return[t,iso,t==='a'?v:new Date().getFullYear()]}
+function abrir(id){
+ edit=id?items.find(i=>i.id===id):null;const r=edit||{cantidad:1};
+ $('#dt').textContent=edit?'Editar objeto':'Agregar objeto';
+ const deps=[...new Set(items.map(i=>i.dependencia).filter(Boolean))].sort();
+ $('#fg').innerHTML=FORM.map(([k,t,ty,x,f])=>{const full=(x==='full'||f)?' full':'',v=r[k]??'';
+  const inp=ty==='s'?`<select name="${k}">${opts(x.includes(v)||!v?x:[...x,v],v,'Seleccionar…')}</select>`
+   :`<input name="${k}" value="${esc(v)}" ${ty==='n'?'type="number" min="0"':''}${ty==='d'?'list="dl"':''}${k==='id'&&edit?' readonly':''}>`;
+  return`<label class="${full}">${t}${inp}</label>`}).join('')+`<datalist id="dl">${deps.map(d=>`<option value="${esc(d)}">`).join('')}</datalist>
+ <label class="full">Fecha de adquisición<span style="display:flex;gap:8px"><select id="ft" onchange="ftog()" style="flex:1"><option value="c">Fecha completa</option><option value="a">Solo año</option><option value="s">Sin información</option></select>
+ <input id="fi" type="date" style="flex:1"><input id="fa" type="number" min="1950" max="2100" style="flex:1"></span></label>`;
+ const[t,iso,y]=fechaUI(r.fecha||'');$('#ft').value=edit?t:'c';$('#fi').value=iso||new Date().toISOString().slice(0,10);$('#fa').value=y;ftog();dlg.showModal()}
+function ftog(){const t=$('#ft').value;$('#fi').hidden=t!=='c';$('#fa').hidden=t!=='a'}
+async function guardar(ev){ev.preventDefault();
+ const d=Object.fromEntries(new FormData($('#frm')));const t=$('#ft').value;
+ d.fecha=t==='c'?($('#fi').value?$('#fi').value.split('-').reverse().join('/'):'Sin información'):t==='a'?$('#fa').value:'Sin información';
+ try{edit?await api('/api/items/'+encodeURIComponent(edit.id),'PUT',d):await api('/api/items','POST',d);
+  dlg.close();toast(edit?'Registro actualizado':'Objeto agregado');await load()}catch(e){toast(e.message,1)}}
+async function descontar(id){const r=items.find(i=>i.id===id);
+ const n=prompt(`¿Cuántas unidades descontar de "${r.objeto_tecnologico}"?\nStock actual: ${r.cantidad}`,'1');if(n===null)return;
+ try{const j=await api('/api/descontar/'+encodeURIComponent(id),'POST',{cantidad:n});toast(`Stock actualizado: ${j.cantidad} unidades`);await load()}catch(e){toast(e.message,1)}}
+async function borrar(id){const r=items.find(i=>i.id===id);
+ if(!confirm(`¿Eliminar "${r.objeto_tecnologico}" (${id})? Esta acción no se puede deshacer.`))return;
+ try{await api('/api/items/'+encodeURIComponent(id),'DELETE');toast('Registro eliminado');await load()}catch(e){toast(e.message,1)}}
+async function historial(){const m=await api('/api/movimientos');
+ $('#hb').innerHTML=m.map(x=>`<tr><td>${esc(x.fecha)}</td><td>${esc(x.accion)}</td><td>${esc(x.objeto)} (${esc(x.item_id)})</td><td>${esc(x.detalle)}</td></tr>`).join('')
+ ||'<tr><td colspan="4" style="padding:24px;color:var(--mut)">Aún no hay movimientos. Se registrarán altas, ediciones, descuentos y bajas.</td></tr>';dh.showModal()}
+function exportar(){const p=new URLSearchParams({q:$('#q').value,categoria:$('#fc').value,estado:$('#fe').value,dependencia:$('#fd').value});location='/api/export?'+p}
+async function load(){items=await api('/api/items');fillFilters();render()}
+load();
+</script></body></html>

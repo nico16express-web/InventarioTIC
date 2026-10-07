@@ -1,5 +1,5 @@
 """Inventario Tecnológico Escolar - versión web (Flask + SQLite)."""
-import hmac, io, os, sqlite3
+import hmac, io, os, re, sqlite3, unicodedata
 from datetime import datetime
 from flask import Flask, Response, jsonify, request, render_template, send_file, g
 import openpyxl
@@ -170,6 +170,84 @@ def descontar(item_id):
 def movimientos():
     rows = db().execute("SELECT * FROM movimientos ORDER BY n DESC LIMIT 200").fetchall()
     return jsonify([dict(r) for r in rows])
+
+ALIAS = {"nivel": "nivel", "id": "id", "codigo": "id", "idcodigo": "id", "serial": "id", "nserie": "id",
+         "objeto": "objeto_tecnologico", "objetotecnologico": "objeto_tecnologico", "nombre": "objeto_tecnologico",
+         "material": "objeto_tecnologico", "descripcion": "objeto_tecnologico",
+         "cantidad": "cantidad", "stock": "cantidad", "stockactual": "cantidad",
+         "dependencia": "dependencia", "ubicacion": "dependencia", "financiamiento": "financiamiento",
+         "adquisicion": "adquisicion", "categoria": "categoria", "estado": "estado",
+         "fecha": "fecha", "fechadeadquisicion": "fecha", "fechaadquisicion": "fecha"}
+
+def norm(h):
+    h = unicodedata.normalize("NFD", str(h or "")).encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z0-9]", "", h)
+
+@app.post("/api/import")
+def importar():
+    f = request.files.get("archivo")
+    if not f: return jsonify(error="Selecciona un archivo Excel (.xlsx)."), 400
+    actualizar = request.form.get("modo") == "actualizar"
+    try:
+        filas = openpyxl.load_workbook(f, read_only=True, data_only=True).active.iter_rows(values_only=True)
+    except Exception:
+        return jsonify(error="No se pudo leer el archivo. Debe ser un Excel .xlsx."), 400
+    cols = {i: ALIAS[norm(h)] for i, h in enumerate(next(filas, None) or []) if norm(h) in ALIAS}
+    if "objeto_tecnologico" not in cols.values():
+        return jsonify(error="No encontré la columna del objeto (Objeto, Nombre o Material) en la primera fila."), 400
+    existentes = {x["id"] for x in db().execute("SELECT id FROM inventario")}
+    res = dict(nuevos=0, actualizados=0, omitidos=0, ids_generados=0, errores=[])
+    sn = 0
+    for n, fila in enumerate(filas, start=2):
+        if not any(c not in (None, "") for c in fila): continue
+        d = {}
+        for i, k in cols.items():
+            v = fila[i] if i < len(fila) else None
+            if isinstance(v, datetime): v = v.strftime("%d/%m/%Y")
+            elif isinstance(v, float) and v.is_integer(): v = int(v)
+            d[k] = "" if v is None else str(v).strip()
+        if d.get("cantidad", "") == "": d["cantidad"] = 1
+        d["estado"] = d.get("estado") or "En uso"
+        if not d.get("id"):
+            while True:
+                sn += 1
+                if f"SN-{sn:04d}" not in existentes: break
+            d["id"] = f"SN-{sn:04d}"; generado = True
+        else:
+            generado = False
+        try:
+            d = validar(d, True)
+        except ValueError as e:
+            res["errores"].append(f"Fila {n}: {e}"); continue
+        res["ids_generados"] += generado
+        if d["id"] in existentes:
+            if not actualizar:
+                res["omitidos"] += 1; continue
+            db().execute("""UPDATE inventario SET nivel=?, objeto_tecnologico=?, cantidad=?, dependencia=?,
+                financiamiento=?, adquisicion=?, categoria=?, estado=?, fecha=? WHERE id=?""",
+                [d[k] for k in CAMPOS[1:]] + [d["id"]])
+            res["actualizados"] += 1; log(d["id"], d["objeto_tecnologico"], "Importación", "Actualizado desde Excel")
+        else:
+            db().execute(f"INSERT INTO inventario VALUES ({','.join('?' * len(CAMPOS))})", [d[k] for k in CAMPOS])
+            existentes.add(d["id"]); res["nuevos"] += 1
+            log(d["id"], d["objeto_tecnologico"], "Importación", f"Alta desde Excel, stock {d['cantidad']}")
+    db().commit()
+    return jsonify(res)
+
+@app.get("/api/plantilla")
+def plantilla():
+    wb = openpyxl.Workbook(); ws = wb.active; ws.title = "Plantilla"
+    ws.append(["Nivel", "ID / Código", "Objeto Tecnológico", "Stock Actual", "Dependencia", "Financiamiento",
+               "Adquisición", "Categoría", "Estado", "Fecha"])
+    ws.append(["Básica", "S/N PC-01", "Notebook de ejemplo", 1, "LABORATORIO DE COMPUTACIÓN", "Inversión",
+               "Subvencion Regular", "Equipos informáticos", "En uso", "2024"])
+    for c in ws[1]:
+        c.fill = PatternFill("solid", start_color="083668"); c.font = Font(color="FFFFFF", bold=True)
+    for col in ws.columns:
+        ws.column_dimensions[col[0].column_letter].width = 24
+    buf = io.BytesIO(); wb.save(buf); buf.seek(0)
+    return send_file(buf, as_attachment=True, download_name="Plantilla_Inventario.xlsx",
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 @app.get("/api/export")
 def exportar():

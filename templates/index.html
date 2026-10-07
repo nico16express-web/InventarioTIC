@@ -51,6 +51,7 @@ dialog h2{margin:0 0 14px;font-size:17px}
 <link rel="icon" href="/favicon.png">
 <header><div class="brand"><img src="/insignia.png" alt="Insignia Escuela Mulchén"><h1><small>Escuela Mulchén</small>Inventario Tecnológico Escolar</h1></div>
 <div class="bar" style="margin:0"><button class="sec" onclick="historial()">Historial</button>
+<button class="sec" onclick="importar()">Importar desde Excel</button>
 <button class="sec" onclick="exportar()">Exportar a Excel</button><button class="acc" onclick="abrir()">Agregar objeto</button></div></header>
 <main>
 <section class="kpis" id="kpis"></section>
@@ -67,13 +68,19 @@ dialog h2{margin:0 0 14px;font-size:17px}
 <div class="ft"><button type="button" class="sec" onclick="dlg.close()">Cancelar</button><button>Guardar cambios</button></div></form></dialog>
 <dialog id="dh"><div class="box"><h2>Historial de movimientos</h2><div class="hist"><table><colgroup><col style="width:6%"><col style="width:11%"><col style="width:23%"><col style="width:5%"><col style="width:14%"><col style="width:17%"><col style="width:8%"><col style="width:7%"><col style="width:9%"></colgroup><thead><tr><th>Fecha</th><th>Acción</th><th>Objeto</th><th>Detalle</th></tr></thead><tbody id="hb"></tbody></table></div>
 <div class="ft"><button class="sec" onclick="dh.close()">Cerrar</button></div></div></dialog>
+<dialog id="di"><form onsubmit="subir(event)"><h2>Importar desde Excel</h2>
+<p style="margin:0 0 12px;color:var(--mut)">La primera fila debe tener los encabezados. Solo es obligatoria la columna <b>Objeto</b> (o Nombre/Material). Si una fila no trae ID, se genera uno automático. <a href="/api/plantilla">Descargar plantilla</a></p>
+<div class="fg"><label class="full">Archivo (.xlsx)<input type="file" id="file" accept=".xlsx"></label>
+<label class="full">Si el ID ya existe<select id="modo"><option value="omitir">Omitir (no cambiar lo existente)</option><option value="actualizar">Actualizar con los datos del Excel</option></select></label></div>
+<div id="ires" style="margin-top:12px"></div>
+<div class="ft"><button type="button" class="sec" onclick="di.close()">Cerrar</button><button id="ibtn">Importar</button></div></form></dialog>
 <div id="toast" role="status"></div>
 <script>
 const L={{ listas|tojson }};
 const COLS=[['nivel','Nivel'],['id','ID / Código'],['objeto_tecnologico','Objeto'],['cantidad','Stock'],['dependencia','Dependencia'],['categoria','Categoría'],['estado','Estado'],['fecha','Fecha']];
 const FORM=[['nivel','Nivel','s',L.niveles],['id','ID / Código','t'],['objeto_tecnologico','Objeto tecnológico','t','full'],['cantidad','Cantidad','n'],['dependencia','Dependencia','d'],['financiamiento','Financiamiento','s',L.financiamiento],['adquisicion','Adquisición','s',L.adquisicion],['categoria','Categoría','s',L.categorias,'full'],['estado','Estado','s',L.estados]];
 let items=[],sort={k:'objeto_tecnologico',d:1},edit=null;
-const $=s=>document.querySelector(s),dlg=$('#dlg'),dh=$('#dh');
+const $=s=>document.querySelector(s),dlg=$('#dlg'),dh=$('#dh'),di=$('#di');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function api(u,m='GET',b){const r=await fetch(u,{method:m,headers:{'Content-Type':'application/json'},body:b&&JSON.stringify(b)});
  const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Error inesperado');return j}
@@ -137,6 +144,13 @@ async function historial(){const m=await api('/api/movimientos');
  $('#hb').innerHTML=m.map(x=>`<tr><td>${esc(x.fecha)}</td><td>${esc(x.accion)}</td><td>${esc(x.objeto)} (${esc(x.item_id)})</td><td>${esc(x.detalle)}</td></tr>`).join('')
  ||'<tr><td colspan="4" style="padding:24px;color:var(--mut)">Aún no hay movimientos. Se registrarán altas, ediciones, descuentos y bajas.</td></tr>';dh.showModal()}
 function exportar(){const p=new URLSearchParams({q:$('#q').value,categoria:$('#fc').value,estado:$('#fe').value,dependencia:$('#fd').value});location='/api/export?'+p}
+function importar(){$('#ires').innerHTML='';$('#file').value='';di.showModal()}
+async function subir(ev){ev.preventDefault();const f=$('#file').files[0];if(!f)return toast('Selecciona un archivo .xlsx',1);
+ const fd=new FormData();fd.append('archivo',f);fd.append('modo',$('#modo').value);const b=$('#ibtn');b.disabled=true;b.textContent='Importando…';
+ try{const r=await fetch('/api/import',{method:'POST',body:fd});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Error al importar');
+  $('#ires').innerHTML=`<p><b>${j.nuevos}</b> nuevos · <b>${j.actualizados}</b> actualizados · <b>${j.omitidos}</b> omitidos${j.ids_generados?` · ${j.ids_generados} con ID generado (SN-0001…)`:''}</p>`
+   +(j.errores.length?`<p style="color:var(--red)">${j.errores.length} filas con error:</p><ul>${j.errores.slice(0,15).map(e=>`<li>${esc(e)}</li>`).join('')}</ul>`:'');
+  await load()}catch(e){toast(e.message,1)}finally{b.disabled=false;b.textContent='Importar'}}
 async function load(){items=await api('/api/items');fillFilters();render()}
 load();
 </script></body></html>

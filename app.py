@@ -6,7 +6,14 @@ import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill
 
 DB = os.environ.get("INVENTARIO_DB", os.path.join(os.path.dirname(os.path.abspath(__file__)), "inventario_escolar.db"))
-DATABASE_URL = os.environ.get("DATABASE_URL")  # si existe -> Postgres (Vercel); si no -> SQLite local
+def _buscar_url():  # acepta DATABASE_URL, POSTGRES_URL o con prefijo (p. ej. STORAGE_DATABASE_URL)
+    e = os.environ
+    for k in ("DATABASE_URL", "POSTGRES_URL"):
+        if e.get(k): return e[k]
+    return next((v for k, v in e.items() if v and k.endswith(("_DATABASE_URL", "_POSTGRES_URL"))), None)
+
+DATABASE_URL = _buscar_url()  # si existe -> Postgres (Vercel); si no -> SQLite local
+ERROR_ARRANQUE = None
 PG = bool(DATABASE_URL)
 if PG:
     import psycopg
@@ -20,7 +27,7 @@ app = Flask(__name__, static_folder="public", static_url_path="")
 class Conn:
     def __init__(self):
         if PG:
-            self.c = psycopg.connect(DATABASE_URL, row_factory=dict_row)
+            self.c = psycopg.connect(DATABASE_URL, row_factory=dict_row, prepare_threshold=None)
         else:
             self.c = sqlite3.connect(DB); self.c.row_factory = sqlite3.Row
     def execute(self, sql, p=()):
@@ -30,6 +37,8 @@ class Conn:
 
 @app.before_request
 def acceso():
+    if ERROR_ARRANQUE:
+        return Response("Error al iniciar la app:\n\n" + ERROR_ARRANQUE, 500, {"Content-Type": "text/plain; charset=utf-8"})
     u, p = os.environ.get("APP_USER"), os.environ.get("APP_PASS")
     if u and p:
         a = request.authorization
@@ -181,6 +190,12 @@ def exportar():
     return send_file(buf, as_attachment=True, download_name=f"Inventario_Escuela_{datetime.now():%Y%m%d}.xlsx",
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-init_db()
+try:
+    if os.environ.get("VERCEL") and not PG:
+        raise RuntimeError("Falta la variable DATABASE_URL en Vercel (Settings > Environment Variables). "
+                           "Conecta una base Neon en Storage y haz Redeploy.")
+    init_db()
+except Exception as e:
+    ERROR_ARRANQUE = f"{type(e).__name__}: {e}"
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
